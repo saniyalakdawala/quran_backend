@@ -5,6 +5,7 @@ import numpy as np
 import faiss
 from sentence_transformers import SentenceTransformer
 from pathlib import Path
+import os
 
 # -----------------------------
 # 1️⃣ Load Quran + Tafsir
@@ -17,25 +18,31 @@ def load_json(file_path):
 
 quran_data = load_json("quran_with_tafsir.json")
 
-# Combine English + Tafsir for embeddings
-texts = [f"{v['english']} {v['tafsir']}" for v in quran_data]
-
 # -----------------------------
-# 2️⃣ Embeddings + FAISS index
+# 2️⃣ Load precomputed embeddings
 # -----------------------------
-print("🔹 Creating embeddings...")
-embedder = SentenceTransformer("all-MiniLM-L6-v2")
-embeddings = np.array(embedder.encode(texts, show_progress_bar=True), dtype="float32")
+EMBEDDINGS_FILE = "quran_embeddings.npy"
 
+if not Path(EMBEDDINGS_FILE).exists():
+    raise FileNotFoundError(f"❌ Embeddings file '{EMBEDDINGS_FILE}' not found! Please precompute locally.")
+
+print("🔹 Loading embeddings...")
+embeddings = np.load(EMBEDDINGS_FILE)
+print(f"✅ Loaded {len(embeddings)} embeddings.")
+
+# FAISS index
 index = faiss.IndexFlatL2(embeddings.shape[1])
 index.add(embeddings)
 print(f"✅ Indexed {len(embeddings)} Quran verses.")
+
+# Load embedding model (can be smaller, e.g., for query only)
+embedder = SentenceTransformer("all-MiniLM-L6-v2")
 
 # -----------------------------
 # 3️⃣ Search function
 # -----------------------------
 def search_verses(query, top_k=5):
-    q_emb = embedder.encode([query])
+    q_emb = embedder.encode([query], convert_to_numpy=True)
     distances, indices = index.search(np.array(q_emb, dtype="float32"), top_k)
     results = []
     for i in indices[0]:
@@ -48,16 +55,16 @@ def search_verses(query, top_k=5):
 # 4️⃣ Format output
 # -----------------------------
 def format_verse_output(verses):
-    output_list = []
-    for v in verses:
-        output_list.append({
+    return [
+        {
             "surah": v["surah"],
             "ayah": v["ayah"],
             "arabic": v["arabic"],
             "english": v["english"],
             "tafsir": v["tafsir"]
-        })
-    return output_list
+        }
+        for v in verses
+    ]
 
 # -----------------------------
 # 5️⃣ Flask app
@@ -115,5 +122,6 @@ def query_quran():
         return jsonify({"message": "No verses found"}), 200
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
-
+    # Render sets PORT env var automatically
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port)
