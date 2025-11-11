@@ -36,7 +36,7 @@ index.add(embeddings)
 print(f"✅ Indexed {len(embeddings)} Quran verses.")
 
 # Load embedding model (can be smaller, e.g., for query only)
-embedder = SentenceTransformer("all-MiniLM-L6-v2")
+embedder = SentenceTransformer("distilbert-base-nli-stsb-mean-tokens")
 
 # -----------------------------
 # 3️⃣ Search function
