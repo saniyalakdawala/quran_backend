@@ -24,7 +24,7 @@ quran_data = load_json("quran_with_tafsir.json")
 EMBEDDINGS_FILE = "quran_embeddings.npy"
 
 if not Path(EMBEDDINGS_FILE).exists():
-    raise FileNotFoundError(f"❌ Embeddings file '{EMBEDDINGS_FILE}' not found! Please precompute locally.")
+    raise FileNotFoundError(f"❌ Embeddings file '{EMBEDDINGS_FILE}' not found! Precompute locally.")
 
 print("🔹 Loading embeddings...")
 embeddings = np.load(EMBEDDINGS_FILE)
@@ -35,8 +35,8 @@ index = faiss.IndexFlatL2(embeddings.shape[1])
 index.add(embeddings)
 print(f"✅ Indexed {len(embeddings)} Quran verses.")
 
-# Load embedding model (can be smaller, e.g., for query only)
-embedder = SentenceTransformer("distilbert-base-nli-stsb-mean-tokens")
+# Load embedding model (query only)
+embedder = SentenceTransformer("all-MiniLM-L6-v2")
 
 # -----------------------------
 # 3️⃣ Search function
@@ -70,9 +70,9 @@ def format_verse_output(verses):
 # 5️⃣ Flask app
 # -----------------------------
 app = Flask(__name__)
-CORS(app)  # allow cross-origin requests from React
+CORS(app)
 
-# store session context
+# Store session context
 session_context = {"last_verses": [], "last_index": 0}
 
 @app.route("/query", methods=["POST"])
@@ -84,7 +84,7 @@ def query_quran():
     if not query:
         return jsonify({"error": "Empty query"}), 400
 
-    # handle "next", "previous", "more"
+    # Handle next / previous / more
     last_verses = session_context["last_verses"]
     last_index = session_context["last_index"]
 
@@ -112,7 +112,7 @@ def query_quran():
             else:
                 return jsonify({"message": "No more verses"}), 200
 
-    # normal search
+    # Normal search
     results = search_verses(query)
     if results:
         session_context["last_verses"] = results
@@ -122,6 +122,6 @@ def query_quran():
         return jsonify({"message": "No verses found"}), 200
 
 if __name__ == "__main__":
-    # Render sets PORT env var automatically
+    # Render automatically provides PORT env var
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
